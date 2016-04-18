@@ -169,7 +169,7 @@ public class FileServer {
                     int limit = buffer.limit();
                     if (limit == 0 && !rp.getMethod().equals("PUT")) {
                         rp.closeChannelAndCancelKey(key);
-                        throw new ReadChannelException(rp.getMethod() + " read null " + channel);// 没有读取到任何数据
+                        throw new ReadChannelException(rp.getMethod() + " readFileChannel null " + channel);// 没有读取到任何数据
                     }
                     byte[] array = new byte[limit];
                     buffer.get(array);

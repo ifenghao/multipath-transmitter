@@ -5,6 +5,7 @@ import client.utils.ContentBuilder;
 
 import java.io.IOException;
 import java.net.InetAddress;
+import java.net.SocketException;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -16,7 +17,7 @@ public class FileNioClient {
     private final int remotePort;
     private String pathRootFind;
     private String pathRootSave;
-    private static AvailableAddressFinder clientFinder = new AvailableAddressFinder();
+    private static AvailableAddressFinder clientFinder;
 
     public FileNioClient(int remotePort) {
         this.remotePort = remotePort;
@@ -24,6 +25,11 @@ public class FileNioClient {
         ContentBuilder.createDir(pathRootFind);
         this.pathRootSave = "/home/zfh/save/";
         ContentBuilder.createDir(pathRootSave);
+        try {
+            clientFinder = new AvailableAddressFinder();
+        } catch (SocketException e) {
+            System.out.println("no available address");
+        }
     }
 
     public void start() throws IOException {
