@@ -1,4 +1,9 @@
-package server;
+package server.utils;
+
+import server.PutMapKey;
+import server.parsers.PutParser;
+import server.parsers.PutStatus;
+import server.parsers.RequestParser;
 
 import java.io.File;
 import java.util.Comparator;

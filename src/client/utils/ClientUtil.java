@@ -1,13 +1,11 @@
-package client;
+package client.utils;
 
 import client.clientexceptions.NoMatchedException;
+import client.parsers.*;
 
-import java.io.File;
 import java.nio.channels.SocketChannel;
-import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 
 /**
  * Created by zfh on 16-3-17.

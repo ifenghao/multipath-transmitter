@@ -1,4 +1,7 @@
-package client;
+package client.utils;
+
+import client.parsers.ClientReceiveParser;
+import client.parsers.ReceiveStatus;
 
 import java.io.File;
 import java.util.Comparator;

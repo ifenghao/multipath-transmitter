@@ -1,6 +1,9 @@
-package client;
+package server.parsers;
+
+import server.utils.FieldReader;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -8,74 +11,31 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 
 /**
- * Created by zfh on 16-2-28.
+ * Created by zfh on 16-3-14.
  */
-enum ReceiveStatus {
-    SEND_REQUEST, WAIT_RESPONSE,
-    ACCEPT_NOT_FOUND("Not Found"), ACCEPT_BAD_REQUEST("Bad Request"), ACCEPT_SERVICE_UNAVAILABLE("Service Unavailable"),
-    WAIT_HEADER("OK"), RECEIVING, RECEIVE_OVER, RESPOND_DONE, FINISHED;
-    private String response;
-
-    private ReceiveStatus() {
-    }
-
-    private ReceiveStatus(String response) {
-        this.response = response;
-    }
-
-    public static ReceiveStatus getMatchedStatus(String response) {
-        for (ReceiveStatus receiveStatus : ReceiveStatus.values()) {
-            if (response.equals(receiveStatus.getResponse())) {
-                return receiveStatus;
-            }
-        }
-        throw new RuntimeException("no this status");
-    }
-
-    public String getResponse() {
-        return response;
-    }
-}
-
-public class ClientReceiveParser extends Parser {
-    private String pathRootSave;
+public class PutParser extends Parser {
+    private String fileName;// 子文件名称 originFileName.tmpX
     private String encoding;
-    private String fileName;
     private int packageNumber;
     private int totalPackages;
     private int subFileLength;
     private int totalFileLength;
+    private String pathRootSave;// 子文件路径 originPath/originFileName.dir/
     private int alreadyReadLength = 0;
-    private ReceiveStatus status;
+    private PutStatus status;
 
-    public ClientReceiveParser(SocketChannel channel, String pathRootSave, boolean needSentRequest) {
+    public PutParser(SocketChannel channel, String pathRootSave) {
         super(channel);
         if (!pathRootSave.endsWith(File.separator)) {
             pathRootSave += File.separator;
         }
         this.pathRootSave = pathRootSave;
-        if (needSentRequest) {
-            this.status = ReceiveStatus.SEND_REQUEST;
-        } else {
-            this.status = ReceiveStatus.WAIT_HEADER;
-        }
+        this.status = PutStatus.WAIT_HEADER;
     }
 
     @Override
-    public void parse(byte[] array) {
-        if (status == ReceiveStatus.WAIT_RESPONSE) {
-            String header = new String(array);
-            FieldReader fieldReader = new FieldReader(header);
-            if (fieldReader.response != null) {
-                status = ReceiveStatus.getMatchedStatus(fieldReader.response);
-                if (status != ReceiveStatus.WAIT_HEADER) {
-                    return;
-                }
-            } else {// 没有接收到服务器的响应引起异常
-                throw new NullPointerException("null response");
-            }
-        }
-        if (status == ReceiveStatus.WAIT_HEADER) {// 再解析子文件首部
+    public void parse(byte[] array) {// 将读取到的数据写入文件
+        if (status == PutStatus.WAIT_HEADER) {
             String header = new String(array);
             int headerEnd = header.indexOf("\r\n\r\n");
             header = header.substring(0, headerEnd + 4);
@@ -85,7 +45,7 @@ public class ClientReceiveParser extends Parser {
             String packageInfo = fieldReader.packageInfo;
             String lengthInfo = fieldReader.LengthInfo;
             if (fileName == null || encoding == null || packageInfo == null || lengthInfo == null) {
-                return;// 本次没有接收到子文件首部，等待下一次接收
+                throw new NullPointerException("header incorrect");
             }
             int solidus1 = packageInfo.indexOf("/");
             this.packageNumber = Integer.parseInt(packageInfo.substring(0, solidus1));
@@ -98,43 +58,48 @@ public class ClientReceiveParser extends Parser {
             byte[] restFileData = new byte[restLength];
             System.arraycopy(array, headerEnd + 4, restFileData, 0, restLength);
             array = restFileData;
-            status = ReceiveStatus.RECEIVING;
+            status = PutStatus.GETTING;
         }
-        if (status == ReceiveStatus.RECEIVING) {// 最后接收文件内容
-            try {// 每次写入文件时都要新建输出流
+        if (status == PutStatus.GETTING) {
+            int arrayLength = array.length;
+            byte[] fileData = new byte[arrayLength];
+            System.arraycopy(array, 0, fileData, 0, arrayLength);
+            try {// alreadyReadLength==0第一次写文件使用覆盖模式，alreadyReadLength>0继续写文件使用追加模式
                 FileOutputStream fileOut = new FileOutputStream(pathRootSave + fileName, alreadyReadLength > 0);
-                fileOut.write(array);
+                fileOut.write(fileData);
                 fileOut.flush();
                 fileOut.close();
+            } catch (FileNotFoundException e) {
+                e.printStackTrace();
             } catch (IOException e) {
                 e.printStackTrace();
             }
-            alreadyReadLength += array.length;
+            alreadyReadLength += arrayLength;
             if (alreadyReadLength > subFileLength) {
                 throw new RuntimeException("alreadyReadLength > subFileLength");
             }
             if (alreadyReadLength == subFileLength) {
-                status = ReceiveStatus.RECEIVE_OVER;
+                status = PutStatus.GET_OVER;
             }
         }
     }
 
-    public void changeReadAndWaitResponse(SelectionKey key) {
-        key.interestOps(SelectionKey.OP_READ);
-        status = ReceiveStatus.WAIT_RESPONSE;
-    }
-
-    public void changeWriteAndRespondDone(SelectionKey key) {
-        String response = "Response:Done\r\n";
+    public void attachAndRespondDone(SelectionKey key) {
+        String response="Response:Done\r\n";
         ByteBuffer buffer = ByteBuffer.wrap(response.getBytes());
         key.attach(buffer);
         key.interestOps(SelectionKey.OP_WRITE);// 转换为写模式发送响应
-        status = ReceiveStatus.RESPOND_DONE;
+        status = PutStatus.RESPOND_DONE;
+    }
+
+    public void changeReadAndGet(SelectionKey key) {
+        key.interestOps(SelectionKey.OP_READ);
+        status = PutStatus.WAIT_HEADER;
     }
 
     public void finishAndChangeRead(SelectionKey key) {
         key.interestOps(SelectionKey.OP_READ);
-        status = ReceiveStatus.FINISHED;
+        status = PutStatus.FINISHED;
     }
 
     public void closeChannelAndCancelKey(SelectionKey key) throws IOException {
@@ -143,16 +108,12 @@ public class ClientReceiveParser extends Parser {
         key.cancel();
     }
 
-    public String getPathRootSave() {
-        return pathRootSave;
+    public String getFileName() {
+        return fileName;
     }
 
     public String getEncoding() {
         return encoding;
-    }
-
-    public String getFileName() {
-        return fileName;
     }
 
     public int getPackageNumber() {
@@ -171,23 +132,58 @@ public class ClientReceiveParser extends Parser {
         return totalFileLength;
     }
 
+    public String getPathRootSave() {
+        return pathRootSave;
+    }
+
     public int getAlreadyReadLength() {
         return alreadyReadLength;
     }
 
-    public ReceiveStatus getStatus() {
+    public PutStatus getStatus() {
         return status;
     }
 
     @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+
+        PutParser putParser = (PutParser) o;
+
+        if (packageNumber != putParser.packageNumber) return false;
+        if (subFileLength != putParser.subFileLength) return false;
+        if (totalFileLength != putParser.totalFileLength) return false;
+        if (totalPackages != putParser.totalPackages) return false;
+        if (encoding != null ? !encoding.equals(putParser.encoding) : putParser.encoding != null) return false;
+        if (fileName != null ? !fileName.equals(putParser.fileName) : putParser.fileName != null) return false;
+        if (pathRootSave != null ? !pathRootSave.equals(putParser.pathRootSave) : putParser.pathRootSave != null)
+            return false;
+
+        return true;
+    }
+
+    @Override
+    public int hashCode() {
+        int result = fileName != null ? fileName.hashCode() : 0;
+        result = 31 * result + (encoding != null ? encoding.hashCode() : 0);
+        result = 31 * result + packageNumber;
+        result = 31 * result + totalPackages;
+        result = 31 * result + subFileLength;
+        result = 31 * result + totalFileLength;
+        result = 31 * result + (pathRootSave != null ? pathRootSave.hashCode() : 0);
+        return result;
+    }
+
+    @Override
     public String toString() {
-        return "ClientReceiveParser{" +
+        return "server.parsers.PutParser{" +
                 "fileName='" + fileName + '\'' +
+                ", encoding='" + encoding + '\'' +
                 ", packageNumber=" + packageNumber +
                 "/" + totalPackages +
                 ", subFileLength=" + subFileLength +
                 "/" + totalFileLength +
-                ", alreadyReadLength=" + alreadyReadLength +
                 ", status=" + status +
                 ", channel=" + getChannel() +
                 '}';

@@ -1,4 +1,7 @@
-package server;
+package server.parsers;
+
+import server.utils.ContentBuilder;
+import server.utils.FieldReader;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -8,10 +11,6 @@ import java.nio.channels.SocketChannel;
 /**
  * Created by zfh on 16-3-14.
  */
-enum GetStatus {
-    PUTTING, WAIT_DONE, FINISHED
-}
-
 public class GetParser extends Parser {
     private GetStatus status;
 

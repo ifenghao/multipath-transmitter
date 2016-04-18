@@ -1,5 +1,10 @@
 package client;
 
+import client.parsers.ClientReceiveParser;
+import client.utils.ClientFileAssembler;
+import client.utils.ClientUtil;
+import client.utils.ContentBuilder;
+
 import java.io.File;
 import java.io.IOException;
 import java.net.*;

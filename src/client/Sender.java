@@ -1,5 +1,9 @@
 package client;
 
+import client.parsers.ClientSendParser;
+import client.utils.ClientUtil;
+import client.utils.SubContentSlicer;
+
 import java.io.IOException;
 import java.net.*;
 import java.nio.ByteBuffer;

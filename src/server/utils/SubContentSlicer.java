@@ -1,4 +1,4 @@
-package server;
+package server.utils;
 
 /**
  * Created by zfh on 16-3-12.

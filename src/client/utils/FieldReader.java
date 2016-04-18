@@ -1,4 +1,4 @@
-package client;
+package client.utils;
 
 /**
  * Created by zfh on 16-3-25.

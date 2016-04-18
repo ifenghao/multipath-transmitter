@@ -1,4 +1,4 @@
-import client.AvailableAddressFinder;
+import client.utils.AvailableAddressFinder;
 
 import java.io.IOException;
 import java.net.*;

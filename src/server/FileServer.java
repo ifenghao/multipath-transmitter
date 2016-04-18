@@ -1,8 +1,10 @@
 package server;
 
+import server.parsers.*;
 import server.serverexceptions.IllegalParserStatusException;
 import server.serverexceptions.ReadChannelException;
 import server.serverexceptions.WriteChannelException;
+import server.utils.*;
 
 import java.io.IOException;
 import java.net.InetAddress;
@@ -257,6 +259,6 @@ public class FileServer {
     }
 
     public static void main(String[] args) throws IOException {
-        new FileServer(2222).start();
+        new FileServer(8080).start();
     }
 }

@@ -1,4 +1,4 @@
-package server;
+package server.utils;
 
 import java.io.File;
 import java.io.FilenameFilter;

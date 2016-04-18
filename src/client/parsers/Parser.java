@@ -1,4 +1,4 @@
-package server;
+package client.parsers;
 
 import java.nio.channels.SocketChannel;
 

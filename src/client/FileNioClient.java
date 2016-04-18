@@ -1,5 +1,8 @@
 package client;
 
+import client.utils.AvailableAddressFinder;
+import client.utils.ContentBuilder;
+
 import java.io.IOException;
 import java.net.InetAddress;
 import java.util.List;
@@ -39,6 +42,6 @@ public class FileNioClient {
     }
 
     public static void main(String[] args) throws IOException {
-        new FileNioClient(2222).start();
+        new FileNioClient(8080).start();
     }
 }

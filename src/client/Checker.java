@@ -1,5 +1,9 @@
 package client;
 
+import client.parsers.CheckStatus;
+import client.parsers.ClientCheckParser;
+import client.utils.ClientUtil;
+
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -84,7 +88,7 @@ public class Checker implements Callable<Void> {
                     }
                     ClientCheckParser ccp = ClientUtil.getMatchedCheckParser(channel, checkList);
                     ccp.parse(array);
-                    if (ccp.getStatus()==CheckStatus.CHECK_OVER){
+                    if (ccp.getStatus()== CheckStatus.CHECK_OVER){
                         System.out.println(ccp.getFiles());
                         ccp.closeChannelAndCancelKey(key);
                     }

@@ -1,5 +1,7 @@
 package server;
 
+import server.utils.ContentBuilder;
+
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.List;
