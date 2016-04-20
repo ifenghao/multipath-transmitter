@@ -17,9 +17,8 @@ public class ContentBuilder {
     private String filePathRoot;
     private String encoding;
     private String fileName;
-    private int fileLength;
-    private byte[] fileData;
-    private String header;// 要包含分包信息，依靠slicer的设定
+    private long fileLength;
+    private ChannelFileReader reader;
 
     public ContentBuilder(String fileName, String filePathRoot) {// 需要读取文件
         this(fileName, filePathRoot, "UTF-8");
@@ -29,46 +28,12 @@ public class ContentBuilder {
         this.filePathRoot = filePathRoot;
         this.encoding = encoding;
         this.fileName = fileName;
-        Path path = Paths.get(filePathRoot + fileName);
         try {
-            byte[] data = Files.readAllBytes(path);
-            this.fileData = data;
-            this.fileLength = data.length;
+            this.reader=new ChannelFileReader(filePathRoot + fileName,65536);
+            this.fileLength = reader.getFileLength();
         } catch (IOException e) {
             e.printStackTrace();
         }
-    }
-
-    public ContentBuilder(String fileName, String pathRootSave, byte[] fileData) {
-        this(fileName, pathRootSave, fileData, "UTF-8");
-    }
-
-    public ContentBuilder(String fileName, String pathRootSave, byte[] fileData, String encoding) {// 使用文件数据构建对象
-        this.filePathRoot = pathRootSave;
-        this.encoding = encoding;
-        this.fileName = fileName;
-        this.fileLength = fileData.length;
-        this.fileData = fileData;
-    }
-
-    public void save() {// 将内存中的cb保存到文件系统中
-        try {
-            FileOutputStream fileOut = new FileOutputStream(filePathRoot + fileName);
-            fileOut.write(fileData);
-            fileOut.flush();
-            fileOut.close();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
-    public boolean delete() {// 将读取到cb中的文件删除
-        File file = new File(filePathRoot + fileName);
-        if (file.isFile() && file.exists()) {
-            file.delete();
-            return true;
-        }
-        return false;
     }
 
     public String getFilePathRoot() {
@@ -83,24 +48,12 @@ public class ContentBuilder {
         return fileName;
     }
 
-    public int getFileLength() {
+    public long getFileLength() {
         return fileLength;
     }
 
-    public byte[] getFileData() {
-        return fileData;
-    }
-
-    public String getHeader() {
-        return header;
-    }
-
-    public void setHeader(String header) {
-        this.header = header;
-    }
-
-    public byte[] getContent() {
-        return concatArrays(getHeader().getBytes(), getFileData());
+    public ChannelFileReader getReader() {
+        return reader;
     }
 
     @Override
@@ -110,8 +63,10 @@ public class ContentBuilder {
 
         ContentBuilder that = (ContentBuilder) o;
 
+        if (fileLength != that.fileLength) return false;
+        if (!encoding.equals(that.encoding)) return false;
+        if (!fileName.equals(that.fileName)) return false;
         if (!filePathRoot.equals(that.filePathRoot)) return false;
-        if (!header.equals(that.header)) return false;
 
         return true;
     }
@@ -119,15 +74,18 @@ public class ContentBuilder {
     @Override
     public int hashCode() {
         int result = filePathRoot.hashCode();
-        result = 31 * result + header.hashCode();
+        result = 31 * result + encoding.hashCode();
+        result = 31 * result + fileName.hashCode();
+        result = 31 * result + (int) (fileLength ^ (fileLength >>> 32));
         return result;
     }
 
     @Override
     public String toString() {
         return "ContentBuilder{" +
-                "filePathRoot='" + filePathRoot + '\'' +
-                ", header='" + header + '\'' +
+                "encoding='" + encoding + '\'' +
+                ", fileName='" + fileName + '\'' +
+                ", fileLength=" + fileLength +
                 '}';
     }
 

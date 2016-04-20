@@ -1,16 +1,17 @@
 package server.utils;
 
+import java.io.IOException;
+
 /**
  * Created by zfh on 16-3-12.
  */
 public class SubContentSlicer {
     private ContentBuilder cb;// 读取到的总文件
     private String fileName;
-    private int number = 0;// 包编号
-    private int totalPackages;// 包总数
+    private long number = 0;// 包编号
+    private long totalPackages;// 包总数
     private int subFileLength;
-    private int previousLength = 0;
-    private int totalFileLength;
+    private long totalFileLength;
     private boolean splitFinished = false;
 
     public SubContentSlicer(String fileName, String filePathRoot, int totalPackages) {
@@ -35,26 +36,24 @@ public class SubContentSlicer {
     }
 
     public void determineTotalPackage(int channels) {
-        this.totalPackages = totalFileLength / 65536;// 发送子文件长度64K不得小于对方接收缓冲区大小4K
+        this.totalPackages = (long) Math.ceil((double) totalFileLength / 65536);// 发送子文件长度64K不得小于对方接收缓冲区大小4K
         if (totalPackages < channels) {
             totalPackages = channels;
         }
     }
 
-    public ContentBuilder next() {
+    public byte[] next() {
         splitFinished = (number == totalPackages - 1);
-        if (splitFinished) {
-            subFileLength = totalFileLength - previousLength;// 最后一组发送剩余所有的数据
-        } else {
-            subFileLength = totalFileLength / totalPackages;// 子文件长度可以逐次改变
-        }
-        byte[] subFileData = new byte[subFileLength];
-        System.arraycopy(cb.getFileData(), previousLength, subFileData, 0, subFileLength);
-        previousLength += subFileLength;
-        ContentBuilder subCb = new ContentBuilder(cb.getFileName(), cb.getFilePathRoot(), subFileData);
-        subCb.setHeader(makeHeader());
+        ChannelFileReader reader = cb.getReader();
         number++;
-        return subCb;
+        try {
+            subFileLength = reader.read();
+            byte[] subFileData = reader.getArray();
+            byte[] header = makeHeader().getBytes();
+            return ContentBuilder.concatArrays(header, subFileData);
+        } catch (IOException e) {
+            return null;
+        }
     }
 
     private String makeHeader() {
@@ -80,7 +79,6 @@ public class SubContentSlicer {
                 ", number=" + number +
                 ", totalPackages=" + totalPackages +
                 ", splitFinished=" + splitFinished +
-                ", previousLength=" + previousLength +
                 ", totalFileLength=" + totalFileLength +
                 '}';
     }

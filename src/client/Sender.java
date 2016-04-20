@@ -16,7 +16,7 @@ import java.util.concurrent.Callable;
 /**
  * Created by zfh on 16-3-10.
  */
-public class Sender implements Callable<Void>{
+public class Sender implements Callable<Void> {
     private Selector selector;
     private final int BUFFER_SIZE = 1024;
     private SubContentSlicer slicer;// 发送一个文件只建立一个分割器
@@ -41,7 +41,7 @@ public class Sender implements Callable<Void>{
                 String header = "Method:PUT\r\n" +
                         "IdCode:" + this.hashCode() + "\r\n" +// 默认的hashCode返回的是内存地址，保证了每个Sender对象不同
                         "FileName:" + fileName + "\r\n" +
-                        "ChannelInfo:" + i+"/"+localIps.size() + "\r\n\r\n";
+                        "ChannelInfo:" + i + "/" + localIps.size() + "\r\n\r\n";
                 csp.attachRequestAndChangeWrite(key, header);
                 sendList.add(csp);
                 System.out.println(channel);
@@ -69,7 +69,7 @@ public class Sender implements Callable<Void>{
                         channel.write(buffer);
                     } else {
                         ClientSendParser csp = ClientUtil.getMatchedSendParser(channel, sendList);
-                        switch (csp.getStatus()){
+                        switch (csp.getStatus()) {
                             case SEND_REQUEST:
                                 csp.changeReadAndWaitResponse(key);
                                 break;
@@ -92,10 +92,10 @@ public class Sender implements Callable<Void>{
                     byte[] array = new byte[limit];
                     buffer.get(array);
                     ClientSendParser csp = ClientUtil.getMatchedSendParser(channel, sendList);
-                    switch (csp.getStatus()){
+                    switch (csp.getStatus()) {
                         case WAIT_RESPONSE:
                             csp.parse(array);
-                            switch (csp.getStatus()){
+                            switch (csp.getStatus()) {
                                 case ACCEPT_OK:
                                     csp.attachContentAndChangeWrite(key, slicer.next());
                                     break;
@@ -109,7 +109,7 @@ public class Sender implements Callable<Void>{
                             break;
                         case WAIT_DONE:
                             csp.parse(array);
-                            switch (csp.getStatus()){
+                            switch (csp.getStatus()) {
                                 case ACCEPT_DONE:
                                     if (slicer.isSplitFinished()) {// 文件分割完成，此通道没有要发送的文件可以关闭
                                         csp.setFinished();
@@ -122,6 +122,8 @@ public class Sender implements Callable<Void>{
                                 default:
                                     break;
                             }
+                        default:
+                            break;
                     }
                 }
             }

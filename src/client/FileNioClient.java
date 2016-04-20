@@ -36,12 +36,12 @@ public class FileNioClient {
         List<InetAddress> localIps = clientFinder.getList();
         String remote = "10.13.88.15";
         ExecutorService pool = Executors.newCachedThreadPool();
-        for (int i = 0; i < 10; i++) {
-            Receiver receiver = new Receiver(remote, remotePort, localIps, 1250 + i, "serverMusic.flac", pathRootSave);
+        for (int i = 0; i < 3; i++) {
+            Receiver receiver = new Receiver(remote, remotePort, localIps, 1210 + i, "serverMusic.flac", pathRootSave);
             pool.submit(receiver);
-            Sender sender = new Sender(remote, remotePort, localIps, 1260 + i, "clientMusic3.flac", pathRootFind);
+            Sender sender = new Sender(remote, remotePort, localIps, 1220 + i, "clientMusic3.flac", pathRootFind);
             pool.submit(sender);
-            Checker checker=new Checker(remote, remotePort, localIps, 1270 + i);
+            Checker checker=new Checker(remote, remotePort, localIps, 1230 + i);
             pool.submit(checker);
         }
         pool.shutdown();

@@ -25,7 +25,7 @@ public class ServerUtil {
     /*
     **********************************PUT util***********************************
      */
-    private static int getTotalPackages(List<PutParser> putList) {
+    private static long getTotalPackages(List<PutParser> putList) {
         for (PutParser pp : putList) {
             if (pp.getStatus() != PutStatus.WAIT_HEADER) {
                 return pp.getTotalPackages();

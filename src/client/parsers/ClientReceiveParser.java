@@ -16,10 +16,11 @@ public class ClientReceiveParser extends Parser {
     private String pathRootSave;
     private String encoding;
     private String fileName;
-    private int packageNumber;
-    private int totalPackages;
+    private long packageNumber;
+    private long totalPackages;
     private int subFileLength;
-    private int totalFileLength;
+    private long totalFileLength;
+    private String totalHeader = "";
     private int alreadyReadLength = 0;
     private ReceiveStatus status;
 
@@ -53,8 +54,12 @@ public class ClientReceiveParser extends Parser {
         if (status == ReceiveStatus.WAIT_HEADER) {// 再解析子文件首部
             String header = new String(array);
             int headerEnd = header.indexOf("\r\n\r\n");
-            header = header.substring(0, headerEnd + 4);
-            FieldReader fieldReader = new FieldReader(header);
+            if (headerEnd == -1) {// 子文件首部没有一次发送完成
+                totalHeader += header;
+                return;
+            }
+            totalHeader += header.substring(0, headerEnd + 4);
+            FieldReader fieldReader = new FieldReader(totalHeader);
             fileName = fieldReader.fileName;
             encoding = fieldReader.encoding;
             String packageInfo = fieldReader.packageInfo;
@@ -63,11 +68,11 @@ public class ClientReceiveParser extends Parser {
                 return;// 本次没有接收到子文件首部，等待下一次接收
             }
             int solidus1 = packageInfo.indexOf("/");
-            this.packageNumber = Integer.parseInt(packageInfo.substring(0, solidus1));
-            this.totalPackages = Integer.parseInt(packageInfo.substring(solidus1 + 1));
+            this.packageNumber = Long.parseLong(packageInfo.substring(0, solidus1));
+            this.totalPackages = Long.parseLong(packageInfo.substring(solidus1 + 1));
             int solidus2 = lengthInfo.indexOf("/");
             this.subFileLength = Integer.parseInt(lengthInfo.substring(0, solidus2));
-            this.totalFileLength = Integer.parseInt(lengthInfo.substring(solidus2 + 1));
+            this.totalFileLength = Long.parseLong(lengthInfo.substring(solidus2 + 1));
             fileName += ".tmp" + packageNumber;// 子文件附属编号
             int restLength = array.length - (headerEnd + 4);
             byte[] restFileData = new byte[restLength];
@@ -130,11 +135,11 @@ public class ClientReceiveParser extends Parser {
         return fileName;
     }
 
-    public int getPackageNumber() {
+    public long getPackageNumber() {
         return packageNumber;
     }
 
-    public int getTotalPackages() {
+    public long getTotalPackages() {
         return totalPackages;
     }
 
@@ -142,7 +147,7 @@ public class ClientReceiveParser extends Parser {
         return subFileLength;
     }
 
-    public int getTotalFileLength() {
+    public long getTotalFileLength() {
         return totalFileLength;
     }
 

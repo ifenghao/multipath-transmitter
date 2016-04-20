@@ -16,11 +16,12 @@ import java.nio.channels.SocketChannel;
 public class PutParser extends Parser {
     private String fileName;// 子文件名称 originFileName.tmpX
     private String encoding;
-    private int packageNumber;
-    private int totalPackages;
+    private long packageNumber;
+    private long totalPackages;
     private int subFileLength;
-    private int totalFileLength;
+    private long totalFileLength;
     private String pathRootSave;// 子文件路径 originPath/originFileName.dir/
+    private String totalHeader = "";
     private int alreadyReadLength = 0;
     private PutStatus status;
 
@@ -38,8 +39,12 @@ public class PutParser extends Parser {
         if (status == PutStatus.WAIT_HEADER) {
             String header = new String(array);
             int headerEnd = header.indexOf("\r\n\r\n");
-            header = header.substring(0, headerEnd + 4);
-            FieldReader fieldReader = new FieldReader(header);
+            if (headerEnd == -1) {// 子文件首部没有一次发送完成
+                totalHeader += header;
+                return;
+            }
+            totalHeader += header.substring(0, headerEnd + 4);
+            FieldReader fieldReader = new FieldReader(totalHeader);
             fileName = fieldReader.fileName;
             encoding = fieldReader.encoding;
             String packageInfo = fieldReader.packageInfo;
@@ -48,11 +53,11 @@ public class PutParser extends Parser {
                 throw new NullPointerException("header incorrect");
             }
             int solidus1 = packageInfo.indexOf("/");
-            this.packageNumber = Integer.parseInt(packageInfo.substring(0, solidus1));
-            this.totalPackages = Integer.parseInt(packageInfo.substring(solidus1 + 1));
+            this.packageNumber = Long.parseLong(packageInfo.substring(0, solidus1));
+            this.totalPackages = Long.parseLong(packageInfo.substring(solidus1 + 1));
             int solidus2 = lengthInfo.indexOf("/");
             this.subFileLength = Integer.parseInt(lengthInfo.substring(0, solidus2));
-            this.totalFileLength = Integer.parseInt(lengthInfo.substring(solidus2 + 1));
+            this.totalFileLength = Long.parseLong(lengthInfo.substring(solidus2 + 1));
             fileName += ".tmp" + packageNumber;// 子文件附属编号
             int restLength = array.length - (headerEnd + 4);
             byte[] restFileData = new byte[restLength];
@@ -85,7 +90,7 @@ public class PutParser extends Parser {
     }
 
     public void attachAndRespondDone(SelectionKey key) {
-        String response="Response:Done\r\n";
+        String response = "Response:Done\r\n";
         ByteBuffer buffer = ByteBuffer.wrap(response.getBytes());
         key.attach(buffer);
         key.interestOps(SelectionKey.OP_WRITE);// 转换为写模式发送响应
@@ -116,11 +121,11 @@ public class PutParser extends Parser {
         return encoding;
     }
 
-    public int getPackageNumber() {
+    public long getPackageNumber() {
         return packageNumber;
     }
 
-    public int getTotalPackages() {
+    public long getTotalPackages() {
         return totalPackages;
     }
 
@@ -128,7 +133,7 @@ public class PutParser extends Parser {
         return subFileLength;
     }
 
-    public int getTotalFileLength() {
+    public long getTotalFileLength() {
         return totalFileLength;
     }
 
@@ -155,23 +160,22 @@ public class PutParser extends Parser {
         if (subFileLength != putParser.subFileLength) return false;
         if (totalFileLength != putParser.totalFileLength) return false;
         if (totalPackages != putParser.totalPackages) return false;
-        if (encoding != null ? !encoding.equals(putParser.encoding) : putParser.encoding != null) return false;
-        if (fileName != null ? !fileName.equals(putParser.fileName) : putParser.fileName != null) return false;
-        if (pathRootSave != null ? !pathRootSave.equals(putParser.pathRootSave) : putParser.pathRootSave != null)
-            return false;
+        if (!encoding.equals(putParser.encoding)) return false;
+        if (!fileName.equals(putParser.fileName)) return false;
+        if (!pathRootSave.equals(putParser.pathRootSave)) return false;
 
         return true;
     }
 
     @Override
     public int hashCode() {
-        int result = fileName != null ? fileName.hashCode() : 0;
-        result = 31 * result + (encoding != null ? encoding.hashCode() : 0);
-        result = 31 * result + packageNumber;
-        result = 31 * result + totalPackages;
+        int result = fileName.hashCode();
+        result = 31 * result + encoding.hashCode();
+        result = 31 * result + (int) (packageNumber ^ (packageNumber >>> 32));
+        result = 31 * result + (int) (totalPackages ^ (totalPackages >>> 32));
         result = 31 * result + subFileLength;
-        result = 31 * result + totalFileLength;
-        result = 31 * result + (pathRootSave != null ? pathRootSave.hashCode() : 0);
+        result = 31 * result + (int) (totalFileLength ^ (totalFileLength >>> 32));
+        result = 31 * result + pathRootSave.hashCode();
         return result;
     }
 

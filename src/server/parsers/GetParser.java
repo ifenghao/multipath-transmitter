@@ -30,8 +30,8 @@ public class GetParser extends Parser {
         }
     }
 
-    public void attachAndChangeWrite(SelectionKey key, ContentBuilder cb) {
-        ByteBuffer buffer = ByteBuffer.wrap(cb.getContent());
+    public void attachAndChangeWrite(SelectionKey key, byte[] content) {
+        ByteBuffer buffer = ByteBuffer.wrap(content);
         key.attach(buffer);
         key.interestOps(SelectionKey.OP_WRITE);// 转换为写模式发送子文件的头部和数据
         status = GetStatus.PUTTING;

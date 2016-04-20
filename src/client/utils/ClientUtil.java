@@ -14,7 +14,7 @@ public class ClientUtil {
     /*
     **********************************Receive util***********************************
      */
-    private static int getTotalPackages(List<ClientReceiveParser> receiveList) {
+    private static long getTotalPackages(List<ClientReceiveParser> receiveList) {
         for (ClientReceiveParser crp : receiveList) {
             if (crp.getStatus() == ReceiveStatus.RECEIVING ||
                     crp.getStatus() == ReceiveStatus.RECEIVE_OVER ||

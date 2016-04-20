@@ -36,8 +36,8 @@ public class ClientSendParser extends Parser {
         this.status = SendStatus.SEND_REQUEST;
     }
 
-    public void attachContentAndChangeWrite(SelectionKey key, ContentBuilder cb) {
-        ByteBuffer contentBuffer = ByteBuffer.wrap(cb.getContent());
+    public void attachContentAndChangeWrite(SelectionKey key, byte[] content) {
+        ByteBuffer contentBuffer = ByteBuffer.wrap(content);
         key.attach(contentBuffer);
         key.interestOps(SelectionKey.OP_WRITE);
         this.status = SendStatus.SENDING;
