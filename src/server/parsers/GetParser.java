@@ -1,6 +1,5 @@
 package server.parsers;
 
-import server.utils.ContentBuilder;
 import server.utils.FieldReader;
 
 import java.io.IOException;
@@ -13,6 +12,8 @@ import java.nio.channels.SocketChannel;
  */
 public class GetParser extends Parser {
     private GetStatus status;
+    private boolean ResponseError = false;
+    private String totalResponse = "";
 
     public GetParser(SocketChannel channel) {
         super(channel);
@@ -22,11 +23,16 @@ public class GetParser extends Parser {
     @Override
     public void parse(byte[] array) {
         String response = new String(array);
-        FieldReader fieldReader = new FieldReader(response);
+        totalResponse += response;// 可能一次没有全部接收完整响应
+        FieldReader fieldReader = new FieldReader(totalResponse);
         if ((fieldReader.response != null) && fieldReader.response.equals("Done")) {
             status = GetStatus.FINISHED;
-        } else {// 对于客户端出现异常的处理
-            throw new NullPointerException("null response");
+            totalResponse = "";
+        } else {
+            if (("Response:Done\r\n").contains(totalResponse)) {
+                return;// 可能没有一次全部接收完整响应
+            }
+            ResponseError = true;// 对于客户端出现异常的处理
         }
     }
 
@@ -45,6 +51,10 @@ public class GetParser extends Parser {
     public void closeChannelAndCancelKey(SelectionKey key) throws IOException {
         getChannel().close();
         key.cancel();
+    }
+
+    public boolean isResponseError() {
+        return ResponseError;
     }
 
     public GetStatus getStatus() {

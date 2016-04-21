@@ -107,6 +107,17 @@ public class ServerUtil {
         return true;
     }
 
+    public static boolean hasActivePutParser(RequestParser rp, Map<PutMapKey, List<PutParser>> putMap){
+        PutMapKey putMapKey = getMatchedPutMapKey(rp, putMap);
+        List<PutParser> putList = putMap.get(putMapKey);
+        for (PutParser ppExist : putList) {
+            if ((ppExist.getStatus() != PutStatus.FINISHED)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /*
     **********************************GET util***********************************
      */

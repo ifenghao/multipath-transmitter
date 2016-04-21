@@ -13,6 +13,7 @@ import java.nio.channels.SocketChannel;
  */
 public class ClientSendParser extends Parser {
     private SendStatus status;
+    private String totalResponse = "";
 
     public ClientSendParser(SocketChannel channel) {
         super(channel);
@@ -21,11 +22,18 @@ public class ClientSendParser extends Parser {
     @Override
     public void parse(byte[] array) {
         String response = new String(array);
-        FieldReader fieldReader=new FieldReader(response);
+        totalResponse += response;// 可能一次没有全部接收完整响应
+        FieldReader fieldReader = new FieldReader(totalResponse);
         if (fieldReader.response != null) {
-            status=SendStatus.getMatchedStatus(fieldReader.response);
-        }else {// 没有接收到服务器的响应引起异常
-
+            status = SendStatus.getMatchedStatus(fieldReader.response);
+            totalResponse = "";
+        } else {
+            for (String responseString : SendStatus.listResponse()) {
+                if (("Response:" + responseString + "\r\n").contains(totalResponse)) {
+                    return;// 可能没有一次全部接收完整响应
+                }
+            }
+            throw new RuntimeException("server response error " + totalResponse);// 接收到服务器错误响应
         }
     }
 
@@ -58,7 +66,7 @@ public class ClientSendParser extends Parser {
         key.cancel();
     }
 
-    public void setFinished(){
+    public void setFinished() {
         this.status = SendStatus.FINISHED;
     }
 

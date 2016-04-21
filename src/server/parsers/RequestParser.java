@@ -26,6 +26,7 @@ public class RequestParser extends Parser {
     private RequestStatus status;
     private String pathRootFind;
     private String pathRootSave;
+    private String totalRequest = "";
 
     public RequestParser(SocketChannel channel, String pathRootFind, String pathRootSave) {
         super(channel);
@@ -38,8 +39,12 @@ public class RequestParser extends Parser {
     public void parse(byte[] array) {// 解析请求中的方法和文件名
         String request = new String(array);
         int headerEnd = request.indexOf("\r\n\r\n");
-        request = request.substring(0, headerEnd + 4);
-        FieldReader fieldReader = new FieldReader(request);
+        if (headerEnd == -1) {// 请求没有一次发送完成
+            totalRequest += request;
+            return;
+        }
+        totalRequest += request.substring(0, headerEnd + 4);
+        FieldReader fieldReader = new FieldReader(totalRequest);
         if (fieldReader.method != null) {
             this.method = fieldReader.method;
         } else {

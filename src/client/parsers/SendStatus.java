@@ -1,5 +1,8 @@
 package client.parsers;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * Created by zfh on 16-4-18.
  */
@@ -23,6 +26,15 @@ public enum SendStatus {
             }
         }
         throw new RuntimeException("no this status");
+    }
+
+    public static List<String> listResponse(){
+        List<String> list=new ArrayList<String>();
+        list.add(ACCEPT_BAD_REQUEST.getResponse());
+        list.add(ACCEPT_SERVICE_UNAVAILABLE.getResponse());
+        list.add(ACCEPT_OK.getResponse());
+        list.add(ACCEPT_DONE.getResponse());
+        return list;
     }
 
     public String getResponse() {

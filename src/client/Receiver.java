@@ -24,6 +24,7 @@ public class Receiver implements Callable<Void> {
     private String fileNameChanged;
     private Selector selector;
     private final int BUFFER_SIZE = 4096;
+    private boolean receiveFailed = false;
     private List<ClientReceiveParser> receiveList = new ArrayList<ClientReceiveParser>();
     private List<SocketChannel> channelList = new ArrayList<SocketChannel>();
 
@@ -66,7 +67,7 @@ public class Receiver implements Callable<Void> {
 
     @Override
     public Void call() throws IOException {
-        while (!ClientUtil.isAllReceived(receiveList)) {
+        while (!ClientUtil.isAllReceived(receiveList) && !receiveFailed) {
             selector.select();
             Set<SelectionKey> readyKeys = selector.selectedKeys();
             Iterator<SelectionKey> iterator = readyKeys.iterator();
@@ -75,12 +76,19 @@ public class Receiver implements Callable<Void> {
                 iterator.remove();
                 if (key.isWritable()) {
                     SocketChannel channel = (SocketChannel) key.channel();
-                    ByteBuffer headerBuffer = (ByteBuffer) key.attachment();
-                    if (headerBuffer.hasRemaining()) {
-                        channel.write(headerBuffer);
+                    ByteBuffer buffer = (ByteBuffer) key.attachment();
+                    if (buffer.hasRemaining()) {
+                        try {
+                            channel.write(buffer);
+                        } catch (IOException e) {
+                            System.out.println(" write channel broken " + channel);
+                            channel.close();
+                            key.cancel();
+                            receiveFailed = true;
+                        }
                     } else {
                         ClientReceiveParser crp = ClientUtil.getMatchedReceiveParser(channel, receiveList);
-                        switch (crp.getStatus()){
+                        switch (crp.getStatus()) {
                             case SEND_REQUEST:// 首先发送请求
                                 crp.changeReadAndWaitResponse(key);
                                 break;
@@ -104,7 +112,15 @@ public class Receiver implements Callable<Void> {
                     SocketChannel channel = (SocketChannel) key.channel();
                     ClientReceiveParser crp = ClientUtil.getMatchedReceiveParser(channel, receiveList);
                     ByteBuffer buffer = ByteBuffer.allocate(BUFFER_SIZE);
-                    channel.read(buffer);
+                    try {
+                        channel.read(buffer);
+                    } catch (IOException e) {
+                        System.out.println(" read channel broken " + channel);
+                        channel.close();
+                        key.cancel();
+                        receiveFailed = true;
+                        continue;
+                    }
                     buffer.flip();
                     int limit = buffer.limit();
                     byte[] array = new byte[limit];
@@ -113,9 +129,12 @@ public class Receiver implements Callable<Void> {
                         System.out.println(" close " + crp);
                         crp.closeChannelAndCancelKey(key);
                         ClientUtil.cleanList(channelList, receiveList);
+                        if (ClientUtil.isReceiveError(channelList, receiveList)) {
+                            receiveFailed = true;
+                        }
                     } else {
                         crp.parse(array);// 处理一次接收的数据
-                        switch (crp.getStatus()){
+                        switch (crp.getStatus()) {
                             case RECEIVE_OVER:// 接收一个子文件完成
                                 crp.changeWriteAndRespondDone(key);
                                 break;
@@ -141,7 +160,10 @@ public class Receiver implements Callable<Void> {
                 }
             }
         }
-        if (receiveList.isEmpty()) {// 没有接收文件，说明请求失败
+        if (receiveFailed) {
+            System.out.println("receive failed");
+            new File(pathRootSaveChanged).delete();
+        } else if (receiveList.isEmpty()) {// 没有接收文件，说明请求失败
             System.out.println("request failed");
             new File(pathRootSaveChanged).delete();
         } else {// 文件全部接收成功开始启动新线程组装文件

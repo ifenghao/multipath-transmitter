@@ -20,6 +20,7 @@ public class Sender implements Callable<Void> {
     private Selector selector;
     private final int BUFFER_SIZE = 1024;
     private SubContentSlicer slicer;// 发送一个文件只建立一个分割器
+    private boolean sendFailed = false;
     private List<ClientSendParser> sendList = Collections.synchronizedList(new ArrayList<ClientSendParser>());// 为每个通道建立解析器
 
     public Sender(String remote, int remotePort, List<InetAddress> localIps, int localPort, String fileName, String pathRootFind) {
@@ -55,7 +56,7 @@ public class Sender implements Callable<Void> {
 
     @Override
     public Void call() throws IOException {
-        while (!ClientUtil.isAllSent(slicer, sendList)) {
+        while (!ClientUtil.isAllSent(slicer, sendList) && !sendFailed) {
             selector.select();
             Set<SelectionKey> readyKeys = selector.selectedKeys();
             Iterator<SelectionKey> iterator = readyKeys.iterator();
@@ -66,7 +67,14 @@ public class Sender implements Callable<Void> {
                     SocketChannel channel = (SocketChannel) key.channel();
                     ByteBuffer buffer = (ByteBuffer) key.attachment();// 只需把附属内容全部发送出去并等待返回的响应
                     if (buffer.hasRemaining()) {
-                        channel.write(buffer);
+                        try {
+                            channel.write(buffer);
+                        } catch (IOException e) {
+                            System.out.println(" write channel broken " + channel);
+                            channel.close();
+                            key.cancel();
+                            sendFailed = true;
+                        }
                     } else {
                         ClientSendParser csp = ClientUtil.getMatchedSendParser(channel, sendList);
                         switch (csp.getStatus()) {
@@ -83,11 +91,19 @@ public class Sender implements Callable<Void> {
                 } else if (key.isReadable()) {
                     SocketChannel channel = (SocketChannel) key.channel();
                     ByteBuffer buffer = ByteBuffer.allocate(BUFFER_SIZE);
-                    channel.read(buffer);
+                    try {
+                        channel.read(buffer);
+                    } catch (IOException e) {
+                        System.out.println(" read channel broken " + channel);
+                        channel.close();
+                        key.cancel();
+                        sendFailed = true;
+                        continue;
+                    }
                     buffer.flip();
                     int limit = buffer.limit();
                     if (limit == 0) {
-                        throw new RuntimeException("limit==0");// 没有读取到任何数据
+                        sendFailed = true;// 没有读取到任何数据
                     }
                     byte[] array = new byte[limit];
                     buffer.get(array);

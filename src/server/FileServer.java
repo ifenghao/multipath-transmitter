@@ -2,8 +2,6 @@ package server;
 
 import server.parsers.*;
 import server.serverexceptions.IllegalParserStatusException;
-import server.serverexceptions.ReadChannelException;
-import server.serverexceptions.WriteChannelException;
 import server.utils.*;
 
 import java.io.IOException;
@@ -84,10 +82,10 @@ public class FileServer {
                         if (buffer.hasRemaining()) {
                             try {
                                 channel.write(buffer);// 写响应
-                            } catch (WriteChannelException e) {
+                            } catch (IOException e) {
+                                logger.severe(" write channel broken " + channel);
                                 channel.close();
                                 key.cancel();
-                                logger.severe(" write channel broken " + channel);
                             }
                         } else {
                             switch (rp.getStatus()) {
@@ -96,7 +94,7 @@ public class FileServer {
                                         rp.startGET(key, getMap);
                                     } else if (rp.getMethod().equals("PUT")) {
                                         rp.startPUT(key, putMap);
-                                    } else if (rp.getMethod().equals("CHECK")){
+                                    } else if (rp.getMethod().equals("CHECK")) {
                                         rp.startCHECK(key);
                                     }
                                     break;
@@ -121,10 +119,10 @@ public class FileServer {
                         if (buffer.hasRemaining()) {
                             try {
                                 channel.write(buffer);
-                            } catch (WriteChannelException e) {
+                            } catch (IOException e) {
+                                logger.severe(" write channel broken " + channel);
                                 channel.close();
                                 key.cancel();
-                                logger.severe(" write channel broken " + channel);
                             }
                         } else {
                             if (rp.getMethod().equals("GET")) {
@@ -153,7 +151,7 @@ public class FileServer {
                                     pp.closeChannelAndCancelKey(key);
                                     throw new IllegalParserStatusException(pp.getStatus() + " expect RESPOND_DONE");
                                 }
-                            } else if (rp.getMethod().equals("CHECK")){
+                            } else if (rp.getMethod().equals("CHECK")) {
                                 logger.info(" CHECK close " + channel);
                                 rp.closeChannelAndCancelKey(key);
                                 requestList.remove(rp);
@@ -164,12 +162,19 @@ public class FileServer {
                     SocketChannel channel = (SocketChannel) key.channel();
                     RequestParser rp = ServerUtil.getMatchedRequestParser(channel, requestList);
                     ByteBuffer buffer = ByteBuffer.allocate(BUFFER_SIZE);
-                    channel.read(buffer);
+                    try {
+                        channel.read(buffer);
+                    } catch (IOException e) {
+                        logger.severe(" read channel broken " + channel);
+                        channel.close();
+                        key.cancel();
+                        continue;
+                    }
                     buffer.flip();
                     int limit = buffer.limit();
                     if (limit == 0 && !rp.getMethod().equals("PUT")) {
                         rp.closeChannelAndCancelKey(key);
-                        throw new ReadChannelException(rp.getMethod() + " read null " + channel);// 没有读取到任何数据
+                        throw new RuntimeException(rp.getMethod() + " read null " + channel);// 没有读取到任何数据
                     }
                     byte[] array = new byte[limit];
                     buffer.get(array);
@@ -185,7 +190,7 @@ public class FileServer {
                                     } else if (rp.getMethod().equals("PUT")) {
                                         rp.deployPUT(putMap);
                                         logger.info(" request PUT " + rp);
-                                    } else if (rp.getMethod().equals("CHECK")){
+                                    } else if (rp.getMethod().equals("CHECK")) {
                                         logger.info(" request CHECK " + rp);
                                     }
                                     break;
@@ -222,7 +227,7 @@ public class FileServer {
                                         } else {// 继续发送下一个子文件
                                             gp.attachAndChangeWrite(key, slicer.next());
                                         }
-                                    } else {
+                                    } else if (gp.isResponseError()) {
                                         gp.closeChannelAndCancelKey(key);
                                         throw new IllegalParserStatusException("should finish, but " + gp.getStatus());
                                     }
@@ -240,6 +245,8 @@ public class FileServer {
                                     if (ServerUtil.isAllPutFinished(rp, putMap)) {// 全部接收完成，创建线程组装文件
                                         new Thread(new ServerFileAssembler(rp, putMap, pathRootSave)).start();
                                         logger.info(" finish PUT " + rp);
+                                    } else if (!ServerUtil.hasActivePutParser(rp, putMap)) {// 没有活动的解释器则通道异常文件接收失败
+                                        logger.warning(" failed PUT " + rp);
                                     }
                                 } else {
                                     pp.parse(array);

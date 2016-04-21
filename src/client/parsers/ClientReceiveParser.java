@@ -21,6 +21,7 @@ public class ClientReceiveParser extends Parser {
     private int subFileLength;
     private long totalFileLength;
     private String totalHeader = "";
+    private String totalResponse = "";
     private int alreadyReadLength = 0;
     private ReceiveStatus status;
 
@@ -40,15 +41,23 @@ public class ClientReceiveParser extends Parser {
     @Override
     public void parse(byte[] array) {
         if (status == ReceiveStatus.WAIT_RESPONSE) {
-            String header = new String(array);
-            FieldReader fieldReader = new FieldReader(header);
+            String response = new String(array);
+            totalResponse += response;
+            FieldReader fieldReader = new FieldReader(totalResponse);
             if (fieldReader.response != null) {
                 status = ReceiveStatus.getMatchedStatus(fieldReader.response);
+                totalResponse = "";
                 if (status != ReceiveStatus.WAIT_HEADER) {
                     return;
                 }
-            } else {// 没有接收到服务器的响应引起异常
-                throw new NullPointerException("null response");
+            } else {
+                System.out.println(totalResponse);
+                for (String responseString : ReceiveStatus.listResponse()) {
+                    if (("Response:" + responseString + "\r\n").contains(totalResponse)) {
+                        return;// 可能没有一次全部接收完整响应
+                    }
+                }
+                throw new RuntimeException("server response error " + totalResponse);// 接收到服务器错误响应
             }
         }
         if (status == ReceiveStatus.WAIT_HEADER) {// 再解析子文件首部

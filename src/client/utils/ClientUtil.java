@@ -54,7 +54,7 @@ public class ClientUtil {
     public static void cleanList(List<SocketChannel> channelList, List<ClientReceiveParser> receiveList) {
         for (SocketChannel channel : channelList) {
             if (channel.isOpen()) {
-                return;
+                return;// 只要有通道开启说明文件还没有传送完成，不能清理
             }
         }
         Iterator<ClientReceiveParser> crpIterator = receiveList.iterator();// 删除元素时必须使用迭代器
@@ -63,6 +63,18 @@ public class ClientUtil {
                 crpIterator.remove();// 无用的解析器要从列表中删除
             }
         }
+    }
+
+    public static boolean isReceiveError(List<SocketChannel> channelList, List<ClientReceiveParser> receiveList){
+        for (SocketChannel channel : channelList) {
+            if (channel.isOpen()) {
+                return false;// 只要有通道开启说明文件还没有传送完成，不能判断错误
+            }
+        }
+        if (receiveList.size() == getTotalPackages(receiveList)) {
+            return false;
+        }
+        return true;
     }
 
     /*
