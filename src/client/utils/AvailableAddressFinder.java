@@ -27,7 +27,7 @@ public class AvailableAddressFinder {
             Enumeration<InetAddress> interfacesAddress = ni.getInetAddresses();
             while (interfacesAddress.hasMoreElements()) {
                 InetAddress localIp = interfacesAddress.nextElement();
-                if (localIp.isSiteLocalAddress()&&isRemoteReachable(localIp)) {// 如果是网站地址就是可用地址
+                if (localIp.isSiteLocalAddress() && isRemoteReachable(localIp)) {// 如果是网站地址就是可用地址
                     availableAddresses.add(localIp);//服务器只用一个地址,客户端使用多个地址
                 }
             }

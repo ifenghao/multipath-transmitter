@@ -75,6 +75,14 @@ public class SubContentSlicer {
         return number;
     }
 
+    public int getSubFileLength() {
+        return subFileLength;
+    }
+
+    public long getTotalFileLength() {
+        return totalFileLength;
+    }
+
     @Override
     public String toString() {
         return "SubContentSlicer{" +

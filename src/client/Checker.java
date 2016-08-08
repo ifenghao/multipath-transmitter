@@ -22,11 +22,12 @@ import java.util.concurrent.Callable;
 /**
  * Created by zfh on 16-4-3.
  */
-public class Checker implements Callable<Void> {
+public class Checker implements Callable<String> {
     private Selector selector;
     private final int BUFFER_SIZE = 4096;
     private List<ClientCheckParser> checkList = new ArrayList<ClientCheckParser>();
     private List<SocketChannel> channelList = new ArrayList<SocketChannel>();
+    private String files;
 
     public Checker(String remote, int remotePort, List<InetAddress> localIps, int localPort) {
         try {
@@ -50,7 +51,6 @@ public class Checker implements Callable<Void> {
                 ClientCheckParser ccp=new ClientCheckParser(channel);
                 checkList.add(ccp);
                 channelList.add(channel);
-                System.out.println(channel);
             }
         } catch (IOException e) {
             e.printStackTrace();
@@ -58,7 +58,7 @@ public class Checker implements Callable<Void> {
     }
 
     @Override
-    public Void call() throws IOException {
+    public String call() throws IOException {
         while (!ClientUtil.isAllChecked(checkList)){
             selector.select();
             Set<SelectionKey> readyKeys = selector.selectedKeys();
@@ -89,12 +89,12 @@ public class Checker implements Callable<Void> {
                     ClientCheckParser ccp = ClientUtil.getMatchedCheckParser(channel, checkList);
                     ccp.parse(array);
                     if (ccp.getStatus()== CheckStatus.CHECK_OVER){
-                        System.out.println(ccp.getFiles());
+                        files = ccp.getFiles();
                         ccp.closeChannelAndCancelKey(key);
                     }
                 }
             }
         }
-        return null;
+        return files;
     }
 }

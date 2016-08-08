@@ -4,7 +4,10 @@ import client.parsers.ClientReceiveParser;
 import client.utils.ClientFileAssembler;
 import client.utils.ClientUtil;
 import client.utils.ContentBuilder;
+import gui.ChannelStatus;
+import gui.MainFrame;
 
+import javax.swing.*;
 import java.io.File;
 import java.io.IOException;
 import java.net.*;
@@ -14,6 +17,7 @@ import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
 import java.util.*;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Created by zfh on 16-3-9.
@@ -27,14 +31,17 @@ public class Receiver implements Callable<Void> {
     private boolean receiveFailed = false;
     private List<ClientReceiveParser> receiveList = new ArrayList<ClientReceiveParser>();
     private List<SocketChannel> channelList = new ArrayList<SocketChannel>();
+    private MainFrame mainFrame;
 
-    public Receiver(String remote, int remotePort, List<InetAddress> localIps, int localPort, String fileName, String pathRootSave) {
+    public Receiver(String remote, int remotePort, List<InetAddress> localIps, int localPort, String fileName, String pathRootSave,
+                    MainFrame mainFrame) {
         if (!pathRootSave.endsWith(File.separator)) {
             pathRootSave += File.separator;
         }
         this.pathRootSaveOriginal = pathRootSave;
         this.fileNameChanged = ContentBuilder.createDir(pathRootSave, fileName);// 创建子文件夹存放接收到的子文件
         this.pathRootSaveChanged = pathRootSave + fileNameChanged + ".dir" + File.separator;
+        this.mainFrame=mainFrame;
         try {// 建立所有本地地址连接到服务器的SocketChannel
             selector = Selector.open();
             for (int i = 0; i < localIps.size(); i++) {
@@ -56,7 +63,7 @@ public class Receiver implements Callable<Void> {
                 ClientReceiveParser crp = new ClientReceiveParser(channel, pathRootSaveChanged, true);
                 receiveList.add(crp);
                 channelList.add(channel);
-                System.out.println(channel);
+//                System.out.println(channel);
             }
         } catch (SocketException e) {
             e.printStackTrace();
@@ -67,6 +74,8 @@ public class Receiver implements Callable<Void> {
 
     @Override
     public Void call() throws IOException {
+        long alreadyLength=0;
+        long totalLength=1;
         while (!ClientUtil.isAllReceived(receiveList) && !receiveFailed) {
             selector.select();
             Set<SelectionKey> readyKeys = selector.selectedKeys();
@@ -79,9 +88,11 @@ public class Receiver implements Callable<Void> {
                     ByteBuffer buffer = (ByteBuffer) key.attachment();
                     if (buffer.hasRemaining()) {
                         try {
-                            channel.write(buffer);
+                            int bytes=channel.write(buffer);
+                            String localIp=channel.getLocalAddress().toString();
+                            mainFrame.getChannelMap().get(localIp.substring(0, localIp.lastIndexOf(":"))).addTX(bytes);
                         } catch (IOException e) {
-                            System.out.println(" write channel broken " + channel);
+                            JOptionPane.showMessageDialog(null, "发送中断", "警告", JOptionPane.WARNING_MESSAGE);
                             channel.close();
                             key.cancel();
                             receiveFailed = true;
@@ -94,6 +105,8 @@ public class Receiver implements Callable<Void> {
                                 break;
                             case RESPOND_DONE:// 接收完成返回响应
                                 crp.finishAndChangeRead(key);
+                                alreadyLength+=crp.getSubFileLength();
+                                totalLength=crp.getTotalFileLength();
                                 if (ClientUtil.hasNextSubFile(receiveList)) {// 总包数不够还要继续接收
                                     ClientReceiveParser cpNew = new ClientReceiveParser(channel, pathRootSaveChanged, false);
                                     receiveList.add(cpNew);
@@ -113,9 +126,11 @@ public class Receiver implements Callable<Void> {
                     ClientReceiveParser crp = ClientUtil.getMatchedReceiveParser(channel, receiveList);
                     ByteBuffer buffer = ByteBuffer.allocate(BUFFER_SIZE);
                     try {
-                        channel.read(buffer);
+                        int bytes=channel.read(buffer);
+                        String localIp=channel.getLocalAddress().toString();
+                        mainFrame.getChannelMap().get(localIp.substring(0, localIp.lastIndexOf(":"))).addRX(bytes);
                     } catch (IOException e) {
-                        System.out.println(" read channel broken " + channel);
+                        JOptionPane.showMessageDialog(null, "接收中断", "警告", JOptionPane.WARNING_MESSAGE);
                         channel.close();
                         key.cancel();
                         receiveFailed = true;
@@ -126,7 +141,7 @@ public class Receiver implements Callable<Void> {
                     byte[] array = new byte[limit];
                     buffer.get(array);
                     if (limit == 0) {// 读取为空说明本通道没有子文件接收，要关闭
-                        System.out.println(" close " + crp);
+//                        System.out.println(" close " + crp);
                         crp.closeChannelAndCancelKey(key);
                         ClientUtil.cleanList(channelList, receiveList);
                         if (ClientUtil.isReceiveError(channelList, receiveList)) {
@@ -139,17 +154,20 @@ public class Receiver implements Callable<Void> {
                                 crp.changeWriteAndRespondDone(key);
                                 break;
                             case ACCEPT_NOT_FOUND:
-                                System.out.println(" not found " + crp);
+//                                System.out.println(" not found " + crp);
+                                JOptionPane.showMessageDialog(null, fileNameChanged+"不存在", "警告", JOptionPane.WARNING_MESSAGE);
                                 crp.closeChannelAndCancelKey(key);
                                 receiveList.remove(crp);// 删除失败请求
                                 break;
                             case ACCEPT_BAD_REQUEST:
-                                System.out.println(" bad request " + crp);
+//                                System.out.println(" bad request " + crp);
+                                JOptionPane.showMessageDialog(null, "请求出错", "警告", JOptionPane.WARNING_MESSAGE);
                                 crp.closeChannelAndCancelKey(key);
                                 receiveList.remove(crp);// 删除失败请求
                                 break;
                             case ACCEPT_SERVICE_UNAVAILABLE:
-                                System.out.println(" service unavailable " + crp);
+//                                System.out.println(" service unavailable " + crp);
+                                JOptionPane.showMessageDialog(null, "服务暂停", "警告", JOptionPane.WARNING_MESSAGE);
                                 crp.closeChannelAndCancelKey(key);
                                 receiveList.remove(crp);// 删除失败请求
                                 break;
@@ -159,15 +177,18 @@ public class Receiver implements Callable<Void> {
                     }
                 }
             }
+            mainFrame.getTaskPane().getTaskMap().get(this).setProgress(alreadyLength,totalLength);
         }
         if (receiveFailed) {
-            System.out.println("receive failed");
+//            System.out.println("receive failed");
+            JOptionPane.showMessageDialog(null, "接收失败", "警告", JOptionPane.WARNING_MESSAGE);
             new File(pathRootSaveChanged).delete();
         } else if (receiveList.isEmpty()) {// 没有接收文件，说明请求失败
-            System.out.println("request failed");
+//            System.out.println("request failed");
+            JOptionPane.showMessageDialog(null, "请求失败", "警告", JOptionPane.WARNING_MESSAGE);
             new File(pathRootSaveChanged).delete();
         } else {// 文件全部接收成功开始启动新线程组装文件
-            System.out.println("all received");
+//            System.out.println("all received");
             new Thread(new ClientFileAssembler(receiveList, fileNameChanged, pathRootSaveOriginal)).start();
         }
         return null;

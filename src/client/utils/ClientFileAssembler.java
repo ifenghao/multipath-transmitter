@@ -3,6 +3,7 @@ package client.utils;
 import client.parsers.ClientReceiveParser;
 import client.parsers.ReceiveStatus;
 
+import javax.swing.*;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -62,9 +63,10 @@ public class ClientFileAssembler implements Runnable {
             if (crp.getStatus() == ReceiveStatus.FINISHED) {
                 long totalLength = crp.getTotalFileLength();
                 if (lengthCounter == totalLength) {
-                    System.out.println("subFiles checked successfully!");
+//                    System.out.println("subFiles checked successfully!");
                 } else {
-                    System.out.println("received:" + lengthCounter + ",expected:" + totalLength);
+//                    System.out.println("received:" + lengthCounter + ",expected:" + totalLength);
+                    JOptionPane.showMessageDialog(null, "接收缺失", "警告", JOptionPane.WARNING_MESSAGE);
                 }
                 new File(crp.getPathRootSave()).delete();// 删除.dir文件夹
                 break;

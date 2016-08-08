@@ -155,7 +155,7 @@ public class RequestParser extends Parser {
         for (int i = 0; i < fileList.length; i++) {
             String concatFile = fileList[i];
             if (i < fileList.length - 1) {
-                concatFile += ", ";
+                concatFile += "\n";
             }
             filesBuilder.append(concatFile);
         }
